@@ -81,10 +81,32 @@ def build_network_graph(df):
     return G
 
 
-def visualize_network(G):
-    """Plotly를 사용한 네트워크 그래프 시각화"""
+def visualize_network(G, df):
+    """Plotly를 사용한 네트워크 그래프 시각화
+    
+    노드 크기: 받은 선택의 총 개수 (친밀도 + 소외도)에 따라 동적으로 조절
+    선: 친밀 관계는 초록색, 소외 관계는 빨간색
+    """
     # Spring layout으로 노드 위치 계산
     pos = nx.spring_layout(G, k=2, iterations=50, seed=42)
+    
+    # 각 학생이 받은 선택 횟수 계산 (노드 크기 기준)
+    in_degree_count = {}
+    for name in df["name"]:
+        total_selections = G.in_degree(name)  # 모든 들어오는 엣지 수
+        in_degree_count[name] = total_selections
+    
+    # 노드 크기 정규화 (최소 15, 최대 50)
+    max_degree = max(in_degree_count.values()) if in_degree_count.values() else 1
+    min_degree = min(in_degree_count.values()) if in_degree_count.values() else 0
+    
+    node_sizes = {}
+    for name in df["name"]:
+        if max_degree == min_degree:
+            normalized = 0.5
+        else:
+            normalized = (in_degree_count[name] - min_degree) / (max_degree - min_degree)
+        node_sizes[name] = 15 + normalized * 35  # 15~50 범위
     
     # 엣지 좌표 생성
     edge_x = []
@@ -103,6 +125,9 @@ def visualize_network(G):
     node_y = [pos[node][1] for node in G.nodes()]
     node_labels = list(G.nodes())
     
+    # 노드 크기 리스트
+    sizes = [node_sizes[node] for node in node_labels]
+    
     # 엣지 추적 생성
     edge_trace_list = []
     for i in range(0, len(edge_x), 3):
@@ -116,7 +141,7 @@ def visualize_network(G):
         )
         edge_trace_list.append(edge_trace)
     
-    # 노드 추적 생성
+    # 노드 추적 생성 (크기 동적 조절)
     node_trace = go.Scatter(
         x=node_x,
         y=node_y,
@@ -124,9 +149,9 @@ def visualize_network(G):
         text=node_labels,
         textposition="top center",
         hoverinfo='text',
-        hovertext=node_labels,
+        hovertext=[f"{label}<br>선택 받음: {in_degree_count[label]}명" for label in node_labels],
         marker=dict(
-            size=20,
+            size=sizes,  # 동적 크기
             color='lightblue',
             line_width=2,
             line_color='darkblue'
@@ -146,7 +171,7 @@ def visualize_network(G):
                             name='서먹한 친구 (distant_friend)'))
     
     fig.update_layout(
-        title_text="또래관계 네트워크 (화살표 방향: 자신 → 대상)",
+        title_text="또래관계 네트워크 (화살표 방향: 자신 → 대상) | 노드 크기: 받은 선택의 많고 적음",
         showlegend=True,
         hovermode='closest',
         margin=dict(b=20, l=5, r=5, t=40),
@@ -259,7 +284,7 @@ st.write("🟢 초록 화살표: 가장 친한 친구 / 🔴 빨간 화살표: �
 
 # 네트워크 그래프 생성 및 시각화
 G = build_network_graph(df)
-fig = visualize_network(G)
+fig = visualize_network(G, df)
 st.plotly_chart(fig, use_container_width=True)
 
 
