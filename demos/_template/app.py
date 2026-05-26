@@ -159,6 +159,43 @@ def visualize_network(G):
     return fig
 
 
+def calculate_network_metrics(df, G):
+    """사회네트워크 지표 계산"""
+    metrics = []
+    
+    for name in df["name"]:
+        # 1. 친밀도 (In-degree of best_friend edges)
+        best_friends_received = sum(1 for _, target, data in G.in_edges(name, data=True) 
+                                   if data.get("relation") == "best")
+        
+        # 2. 소외도 (In-degree of distant_friend edges)
+        distant_received = sum(1 for _, target, data in G.in_edges(name, data=True) 
+                              if data.get("relation") == "distant")
+        
+        # 3. 중심성 (Degree Centrality)
+        centrality = nx.degree_centrality(G).get(name, 0)
+        
+        # 4. 친한 친구 수 (Outgoing best_friend edges)
+        best_friends_count = sum(1 for _, _, data in G.out_edges(name, data=True) 
+                                if data.get("relation") == "best")
+        
+        # 5. 서먹한 친구 수 (Outgoing distant_friend edges)
+        distant_count = sum(1 for _, _, data in G.out_edges(name, data=True) 
+                           if data.get("relation") == "distant")
+        
+        metrics.append({
+            "이름": name,
+            "👍 받은 친밀표시": best_friends_received,
+            "👎 받은 소외표시": distant_received,
+            "🔗 중심성": round(centrality, 3),
+            "💚 선택한 친한친구": best_friends_count,
+            "💔 선택한 소외친구": distant_count,
+            "📊 관계성향": "외향적" if best_friends_received > distant_received else "내향적"
+        })
+    
+    return pd.DataFrame(metrics).sort_values("👍 받은 친밀표시", ascending=False)
+
+
 # ──────────────────────────────────────────────────────────────
 # 사이드바: 파일 업로더
 # ──────────────────────────────────────────────────────────────
@@ -227,7 +264,36 @@ st.plotly_chart(fig, use_container_width=True)
 
 
 # ──────────────────────────────────────────────────────────────
-# 기능 3. (TODO) 관계 분석 (친밀도, 소외 등)
+# 기능 3. 관계 분석 (친밀도, 소외도, 중심성)
 # ──────────────────────────────────────────────────────────────
-st.subheader("③ 관계 분석 (작성 예정)")
-st.write("Copilot에게: '소외도, 친밀도, 중심성 등 사회네트워크 지표를 계산해서 표로 보여줘'")
+st.subheader("③ 관계 분석 지표")
+st.write("각 학생의 사회네트워크 지표 (친밀도, 소외도, 중심성 등)")
+
+# 메트릭 계산
+metrics_df = calculate_network_metrics(df, G)
+
+# 지표 설명
+with st.expander("📖 지표 설명"):
+    st.markdown("""
+    - **👍 받은 친밀표시**: 다른 학생들이 이 학생을 '친한 친구'로 선택한 횟수
+    - **👎 받은 소외표시**: 다른 학생들이 이 학생을 '서먹한 친구'로 선택한 횟수
+    - **🔗 중심성**: 0~1 사이의 값으로, 1에 가까울수록 네트워크의 중심에 있음 (사교성 지표)
+    - **💚 선택한 친한친구**: 이 학생이 '친한 친구'로 선택한 수
+    - **💔 선택한 소외친구**: 이 학생이 '서먹한 친구'로 선택한 수
+    - **📊 관계성향**: 받은 친밀표시 > 소외표시면 '외향적', 반대면 '내향적'
+    """)
+
+st.dataframe(metrics_df, use_container_width=True, hide_index=True)
+
+# 추가 분석: 상위/하위 분석
+col1, col2 = st.columns(2)
+
+with col1:
+    st.markdown("### 🏆 친밀도 상위 5명")
+    top_intimate = metrics_df.nlargest(5, "👍 받은 친밀표시")[["이름", "👍 받은 친밀표시"]]
+    st.dataframe(top_intimate, use_container_width=True, hide_index=True)
+
+with col2:
+    st.markdown("### ⚠️ 소외도 상위 5명")
+    top_isolated = metrics_df.nlargest(5, "👎 받은 소외표시")[["이름", "👎 받은 소외표시"]]
+    st.dataframe(top_isolated, use_container_width=True, hide_index=True)
