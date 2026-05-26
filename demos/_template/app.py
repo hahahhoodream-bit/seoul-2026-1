@@ -1,5 +1,5 @@
 """
-{{프로젝트 제목}} — Streamlit 시작 골격
+우리반 마음 지도 : 또래관계 네트워크 시각화 도구 — Streamlit 시작 골격
 
 ⚠️ 이 파일은 빈 골격입니다. Copilot에게 다음 순서로 프롬프트하세요.
    1) 사이드바 CSV 업로더 만들기
@@ -15,13 +15,13 @@ import pandas as pd
 import streamlit as st
 
 st.set_page_config(
-    page_title="{{프로젝트 제목}}",
+    page_title="우리반 마음 지도",
     page_icon="📊",
     layout="wide",
 )
 
-st.title("📊 {{프로젝트 제목}}")
-st.caption("{{한 줄 요약}}")
+st.title("📊 우리반 마음 지도")
+st.caption("또래관계 네트워크 시각화 도구")
 
 
 # ──────────────────────────────────────────────────────────────
