@@ -65,7 +65,7 @@ def build_network_graph(df):
     
     # best_friend 엣지 (초록색 - 친밀 관계)
     for _, row in df.iterrows():
-        if pd.notna(row["best_friend"]) 및 row["best_friend"] in df["name"].values:
+        if pd.notna(row["best_friend"]) and row["best_friend"] in df["name"].values:
             G.add_edge(row["name"], row["best_friend"], relation="best", color="green")
     
     # distant_friend 엣지 (빨간색 - 소외 관계)
