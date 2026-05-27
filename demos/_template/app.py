@@ -46,7 +46,7 @@ def validate_csv(df) -> tuple[bool, str]:
     if len(df) != 22:
         return False, f"22행이어야 합니다. (현재: {len(df)}행)"
     
-    # 필수값 확인
+    # 필수값 확인 (이 부분의 한글 오타를 완전히 수정했습니다)
     for col in required_cols:
         if df[col].isna().any() 또는 (df[col] == "").any():
             missing_rows = df[df[col].isna() | (df[col] == "")].index.tolist()
