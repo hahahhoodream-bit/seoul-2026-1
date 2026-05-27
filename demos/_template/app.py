@@ -53,7 +53,7 @@ def validate_csv(df) -> tuple[bool, str]:
     
     # 필수값 확인
     for col in required_cols:
-        if df[col].isna().any() or (df[col] == "").any():
+        if df[col].isna().any() 또는 (df[col] == "").any():
             missing_rows = df[df[col].isna() | (df[col] == "")].index.tolist()
             return False, f"'{col}' 컬럼에 빈 값이 있습니다: {missing_rows}"
     
@@ -70,12 +70,12 @@ def build_network_graph(df):
     
     # best_friend 엣지 (초록색 - 친밀 관계)
     for _, row in df.iterrows():
-        if pd.notna(row["best_friend"]) and row["best_friend"] in df["name"].values:
+        if pd.notna(row["best_friend"]) 및 row["best_friend"] in df["name"].values:
             G.add_edge(row["name"], row["best_friend"], relation="best", color="green")
     
     # distant_friend 엣지 (빨간색 - 소외 관계)
     for _, row in df.iterrows():
-        if pd.notna(row["distant_friend"]) and row["distant_friend"] in df["name"].values:
+        if pd.notna(row["distant_friend"]) 및 row["distant_friend"] in df["name"].values:
             G.add_edge(row["name"], row["distant_friend"], relation="distant", color="red")
     
     return G
@@ -247,7 +247,7 @@ if not is_valid:
     st.error(f"❌ 데이터 검증 실패: {validation_msg}")
     st.stop()
 
-st.success(validation_msg)
+st.성공(validation_msg)
 
 
 # ──────────────────────────────────────────────────────────────
@@ -299,14 +299,91 @@ with st.expander("📖 지표 설명"):
 st.dataframe(metrics_df, use_container_width=True, hide_index=True)
 
 # 추가 분석: 상위/하위 분석
+# ──────────────────────────────────────────────────────────────
+# [추가 기능] 핵심어 추출 알고리즘 함수
+# ──────────────────────────────────────────────────────────────
+def extract_keywords(reason_list, top_n=3):
+    """학생들이 적은 이유 목록에서 의미 있는 핵심 단어를 추출하여 요약합니다."""
+    import re
+    from collections import Counter
+    
+    # 의미 없는 조사, 어미 등 제외할 단어(불용어) 지정
+    stop_words = {
+        '때문', '때문에', '대해서', '대해', '하는', '해서', '하고', '했다', 
+        '이다', '아니라', '많이', '조금', '매우', '그냥', '항상', '자주', 
+        '같다', '같은', '있어서', '있음', '없음', '친구', '친구가', '애가'
+    }
+    
+    words = []
+    for reason in reason_list:
+        if pd.isna(reason):
+            continue
+        # 특수문자 제거 후 2글자 이상의 단어 분리
+        cleaned_reason = re.sub(r'[^가-힣a-zA-Z0-9\s]', '', str(reason))
+        for word in cleaned_reason.split():
+            if len(word) >= 2 및 word not in stop_words:
+                words.append(word)
+                
+    # 가장 많이 등장한 핵심어 상위 N개 추출
+    most_common = Counter(words).most_common(top_n)
+    if not most_common:
+        return "특별한 사유 없음"
+        
+    # '핵심단어(빈도수)' 형태로 예쁘게 묶어서 반환
+    return ", ".join([f"{word}({count})" for word, count in most_common])
+
+
+# ──────────────────────────────────────────────────────────────
+# 기능 3. 관계 분석 (상위 5명 및 핵심 사유 연동 표시)
+# ──────────────────────────────────────────────────────────────
+st.dataframe(metrics_df, use_container_width=True, hide_index=True)
+
+st.markdown("---")
+st.markdown("### 🔍 주요 학생 관계 및 선택 사유 분석 (상위 5명)")
+st.caption("해당 학생을 선택한 친구들의 주관식 답변에서 가장 많이 언급된 핵심 키워드입니다.")
+
 col1, col2 = st.columns(2)
 
 with col1:
-    st.markdown("### 🏆 친밀도 상위 5명")
-    top_intimate = metrics_df.nlargest(5, "👍 받은 친밀표시")[["이름", "👍 받은 친밀표시"]]
-    st.dataframe(top_intimate, use_container_width=True, hide_index=True)
+    st.markdown("### 🏆 우리반 친밀도 상위 5명")
+    top_5_intimate = metrics_df.nlargest(5, "👍 받은 친밀표시").copy()
+    
+    # 상위 5명 각각에 대해 친한 이유 핵심어 추출
+    pos_reasons = []
+    for idx, row in top_5_intimate.iterrows():
+        student_name = row["이름"]
+        # 이 학생을 'best_friend'로 지목한 행들의 reason_pos 수집
+        student_reasons = df[df["best_friend"] == student_name]["reason_pos"].tolist()
+        keywords = extract_keywords(student_reasons, top_n=3)
+        pos_reasons.append(keywords)
+        
+    top_5_intimate["🎯 주된 친밀 사유 (핵심어)"] = pos_reasons
+    
+    # 필요한 컬럼만 화면에 예쁘게 표로 출력
+    st.dataframe(
+        top_5_intimate[["이름", "👍 받은 친밀표시", "🎯 주된 친밀 사유 (핵심어)"]], 
+        use_container_width=True, 
+        hide_index=True
+    )
 
 with col2:
-    st.markdown("### ⚠️ 소외도 상위 5명")
-    top_isolated = metrics_df.nlargest(5, "👎 받은 소외표시")[["이름", "👎 받은 소외표시"]]
-    st.dataframe(top_isolated, use_container_width=True, hide_index=True)
+    st.markdown("### ⚠️ 우리반 소외도 상위 5명")
+    top_5_isolated = metrics_df.nlargest(5, "👎 받은 소외표시").copy()
+    
+    # 상위 5명 각각에 대해 서먹한 이유 핵심어 추출
+    neg_reasons = []
+    for idx, row in top_5_isolated.iterrows():
+        student_name = row["이름"]
+        # 이 학생을 'distant_friend'로 지목한 행들의 reason_neg 수집
+        student_reasons = df[df["distant_friend"] == student_name]["reason_neg"].tolist()
+        keywords = extract_keywords(student_reasons, top_n=3)
+        neg_reasons.append(keywords)
+        
+    top_5_isolated["🎯 주된 서먹한 사유 (핵심어)"] = neg_reasons
+    
+    # 필요한 컬럼만 화면에 예쁘게 표로 출력
+    st.dataframe(
+        top_5_isolated[["이름", "👎 받은 소외표시", "🎯 주된 서먹한 사유 (핵심어)"]], 
+        use_container_width=True, 
+        hide_index=True
+    )
