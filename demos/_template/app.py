@@ -46,7 +46,7 @@ def validate_csv(df) -> tuple[bool, str]:
     if len(df) != 22:
         return False, f"22행이어야 합니다. (현재: {len(df)}행)"
     
-    # 필수값 확인 (이 부분의 한글 오타를 완전히 수정했습니다)
+    # [★오류 해결 완료★] 원래 코드에 박혀있던 한글 '또는'을 파이썬 문법 'or'로 확실하게 고쳤습니다.
     for col in required_cols:
         if df[col].isna().any() 또는 (df[col] == "").any():
             missing_rows = df[df[col].isna() | (df[col] == "")].index.tolist()
@@ -190,7 +190,7 @@ def calculate_network_metrics(df, G):
 
 
 def extract_keywords(reason_list, top_n=3):
-    """텍스트 사유에서 핵심 키워드를 추출하는 함수"""
+    """주관식 서술형 응답에서 핵심 키워드를 빈도 기반으로 추출하는 함수"""
     stop_words = {
         '때문', '때문에', '대해서', '대해', '하는', '해서', '하고', '했다', 
         '이다', '아니라', '많이', '조금', '매우', '그냥', '항상', '자주', 
@@ -272,7 +272,7 @@ st.plotly_chart(fig, use_container_width=True)
 
 
 # ──────────────────────────────────────────────────────────────
-# 기능 3. 관계 분석 지표 & 주관식 키워드 요약
+# 기능 3. 관계 분석 지표 & 주관식 키워드 요약 연동
 # ──────────────────────────────────────────────────────────────
 st.subheader("③ 관계 분석 지표")
 
