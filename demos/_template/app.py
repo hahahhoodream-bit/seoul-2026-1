@@ -200,21 +200,11 @@ def calculate_network_metrics(df, G):
         # 3. 중심성 (Degree Centrality)
         centrality = nx.degree_centrality(G).get(name, 0)
         
-        # 4. 친한 친구 수 (Outgoing best_friend edges)
-        best_friends_count = sum(1 for _, _, data in G.out_edges(name, data=True) 
-                                if data.get("relation") == "best")
-        
-        # 5. 서먹한 친구 수 (Outgoing distant_friend edges)
-        distant_count = sum(1 for _, _, data in G.out_edges(name, data=True) 
-                           if data.get("relation") == "distant")
-        
         metrics.append({
             "이름": name,
             "👍 받은 친밀표시": best_friends_received,
             "👎 받은 소외표시": distant_received,
             "🔗 중심성": round(centrality, 3),
-            "💚 선택한 친한친구": best_friends_count,
-            "💔 선택한 소외친구": distant_count,
             "📊 관계성향": "외향적" if best_friends_received > distant_received else "내향적"
         })
     
@@ -303,8 +293,6 @@ with st.expander("📖 지표 설명"):
     - **👍 받은 친밀표시**: 다른 학생들이 이 학생을 '친한 친구'로 선택한 횟수
     - **👎 받은 소외표시**: 다른 학생들이 이 학생을 '서먹한 친구'로 선택한 횟수
     - **🔗 중심성**: 0~1 사이의 값으로, 1에 가까울수록 네트워크의 중심에 있음 (사교성 지표)
-    - **💚 선택한 친한친구**: 이 학생이 '친한 친구'로 선택한 수
-    - **💔 선택한 소외친구**: 이 학생이 '서먹한 친구'로 선택한 수
     - **📊 관계성향**: 받은 친밀표시 > 소외표시면 '외향적', 반대면 '내향적'
     """)
 
