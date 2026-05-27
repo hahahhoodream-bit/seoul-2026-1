@@ -241,7 +241,7 @@ if not is_valid:
     st.error(f"❌ 데이터 검증 실패: {validation_msg}")
     st.stop()
 
-st.성공(validation_msg)
+st.success(validation_msg)
 
 
 # ──────────────────────────────────────────────────────────────
