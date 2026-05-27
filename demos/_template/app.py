@@ -203,7 +203,7 @@ def extract_keywords(reason_list, top_n=3):
             continue
         cleaned_reason = re.sub(r'[^가-힣a-zA-Z0-9\s]', '', str(reason))
         for word in cleaned_reason.split():
-            if len(word) >= 2 및 word not in stop_words:
+            if len(word) >= 2 and word not in stop_words:
                 words.append(word)
                 
     most_common = Counter(words).most_common(top_n)
