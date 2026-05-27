@@ -46,7 +46,7 @@ def validate_csv(df) -> tuple[bool, str]:
     if len(df) != 22:
         return False, f"22행이어야 합니다. (현재: {len(df)}행)"
     
-    # [★오류 해결 완료★] 원래 코드에 박혀있던 한글 '또는'을 파이썬 문법 'or'로 확실하게 고쳤습니다.
+    # 필수값 확인
     for col in required_cols:
         if df[col].isna().any() or (df[col] == "").any():
             missing_rows = df[df[col].isna() | (df[col] == "")].index.tolist()
@@ -189,28 +189,53 @@ def calculate_network_metrics(df, G):
     return pd.DataFrame(metrics).sort_values("👍 받은 친밀표시", ascending=False)
 
 
-def extract_keywords(reason_list, top_n=3):
-    """주관식 서술형 응답에서 핵심 키워드를 빈도 기반으로 추출하는 함수"""
-    stop_words = {
-        '때문', '때문에', '대해서', '대해', '하는', '해서', '하고', '했다', 
-        '이다', '아니라', '많이', '조금', '매우', '그냥', '항상', '자주', 
-        '같다', '같은', '있어서', '있음', '없음', '친구', '친구가', '애가'
-    }
-    
-    words = []
-    for reason in reason_list:
-        if pd.isna(reason):
-            continue
-        cleaned_reason = re.sub(r'[^가-힣a-zA-Z0-9\s]', '', str(reason))
-        for word in cleaned_reason.split():
-            if len(word) >= 2 and word not in stop_words:
-                words.append(word)
-                
-    most_common = Counter(words).most_common(top_n)
-    if not most_common:
-        return "특별한 사유 없음"
+# [★기능 변경★] 텍스트를 파편화하지 않고 의미 단위 문장 그룹으로 자동 판별해 매핑해주는 함수
+def summarize_reasons_by_group(reason_list, is_positive=True):
+    if not reason_list:
+        return "데이터 없음"
         
-    return ", ".join([f"{word}({count})" for word, count in most_common])
+    categories = Counter()
+    raw_texts = []
+    
+    for reason in reason_list:
+        if pd.isna(reason) or str(reason).strip() == "":
+            continue
+        text = str(reason).strip()
+        raw_texts.append(text)
+        
+        if is_positive:
+            if any(w in text for w in ["성격", "착하다", "활발", "밝다", "좋다"]):
+                categories["성격이 좋고 활발함"] += 1
+            elif any(w in text for w in ["친절", "도와", "배려", "잘해"]):
+                categories["친절하고 배려심이 많음"] += 1
+            elif any(w in text for w in ["재미", "웃기", "재밌"]):
+                categories["유머러스하고 같이 있으면 즐거움"] += 1
+            elif any(w in text for w in ["취미", "게임", "통한다", "관심사", "이야기"]):
+                categories["취미나 대화가 잘 통함"] += 1
+            else:
+                categories["기타 친근감 표시"] += 1
+        else:
+            if any(w in text for w in ["말", "대화", "이야기", "서먹", "어색"]):
+                categories["평소 대화나 소통이 부족함"] += 1
+            elif any(w in text for w in ["싸움", "장난", "괴롭", "시비"]):
+                categories["과도한 장난이나 갈등이 있었음"] += 1
+            elif any(w in text for w in ["무시", "이기", "욕", "성격"]):
+                categories["성격적 차이 및 배려 부족"] += 1
+            elif any(w in text for w in ["반", "조", "기회"]):
+                categories["같은 모둠이나 놀 기회가 없었음"] += 1
+            else:
+                categories["특별한 갈등 없는 단순 서먹함"] += 1
+
+    top_categories = categories.most_common(2)
+    if not top_categories:
+        valid_raws = [t for t in raw_texts if len(t) > 2]
+        return valid_raws[0] if valid_raws else "특별한 사유 없음"
+        
+    summary_sentences = []
+    for cat, count in top_categories:
+        summary_sentences.append(f"{cat}({count}명)")
+        
+    return " / ".join(summary_sentences)
 
 
 # ──────────────────────────────────────────────────────────────
@@ -272,49 +297,63 @@ st.plotly_chart(fig, use_container_width=True)
 
 
 # ──────────────────────────────────────────────────────────────
-# 기능 3. 관계 분석 지표 & 주관식 키워드 요약 연동
+# 기능 3. 관계 분석 지표 & 기존 지표 설명 유지
 # ──────────────────────────────────────────────────────────────
 st.subheader("③ 관계 분석 지표")
+st.write("각 학생의 사회네트워크 지표 (친밀도, 소외도, 중심성 등)")
 
 metrics_df = calculate_network_metrics(df, G)
+
+# 기존에 있던 지표 설명 박스 원본 그대로 복구 완료
+with st.expander("📖 지표 설명"):
+    st.markdown("""
+    - **👍 받은 친밀표시**: 다른 학생들이 이 학생을 '친한 친구'로 선택한 횟수
+    - **👎 받은 소외표시**: 다른 학생들이 이 학생을 '서먹한 친구'로 선택한 횟수
+    - **🔗 중심성**: 0~1 사이의 값으로, 1에 가까울수록 네트워크의 중심에 있음 (사교성 지표)
+    - **📊 관계성향**: 받은 친밀표시 > 소외표시면 '외향적', 반대면 '내향적'
+    """)
+
 st.dataframe(metrics_df, use_container_width=True, hide_index=True)
 
+# ──────────────────────────────────────────────────────────────
+# 사유 요약 연동 레이아웃 영역 (하단에 깔끔하게 배치)
+# ──────────────────────────────────────────────────────────────
 st.markdown("---")
 st.markdown("### 🔍 주요 학생 관계 및 선택 사유 분석 (상위 5명)")
-st.caption("해당 학생을 선택한 친구들의 답변에서 가장 많이 언급된 핵심 키워드입니다.")
+st.caption("학생들의 주관식 서술 답변들을 유사 의미 단위로 자동 분류 및 종합한 문장 요약 결과입니다.")
 
-col1, col2 = st.columns(2)
+col_pos, col_neg = st.columns(2)
 
-with col1:
+with col_pos:
     st.markdown("### 🏆 우리반 친밀도 상위 5명")
     top_5_intimate = metrics_df.nlargest(5, "👍 받은 친밀표시").copy()
     
-    pos_reasons = []
+    pos_summaries = []
     for idx, row in top_5_intimate.iterrows():
         student_name = row["이름"]
         student_reasons = df[df["best_friend"] == student_name]["reason_pos"].tolist()
-        pos_reasons.append(extract_keywords(student_reasons, top_n=3))
+        pos_summaries.append(summarize_reasons_by_group(student_reasons, is_positive=True))
         
-    top_5_intimate["🎯 주된 친밀 사유 (핵심어)"] = pos_reasons
+    top_5_intimate["🎯 주된 친밀 사유 요약 (문장그룹)"] = pos_summaries
     st.dataframe(
-        top_5_intimate[["이름", "👍 받은 친밀표시", "🎯 주된 친밀 사유 (핵심어)"]], 
+        top_5_intimate[["이름", "👍 받은 친밀표시", "🎯 주된 친밀 사유 요약 (문장그룹)"]], 
         use_container_width=True, 
         hide_index=True
     )
 
-with col2:
+with col_neg:
     st.markdown("### ⚠️ 우리반 소외도 상위 5명")
     top_5_isolated = metrics_df.nlargest(5, "👎 받은 소외표시").copy()
     
-    neg_reasons = []
+    neg_summaries = []
     for idx, row in top_5_isolated.iterrows():
         student_name = row["이름"]
         student_reasons = df[df["distant_friend"] == student_name]["reason_neg"].tolist()
-        neg_reasons.append(extract_keywords(student_reasons, top_n=3))
+        neg_summaries.append(summarize_reasons_by_group(student_reasons, is_positive=False))
         
-    top_5_isolated["🎯 주된 서먹한 사유 (핵심어)"] = neg_reasons
+    top_5_isolated["🎯 주된 서먹한 사유 요약 (문장그룹)"] = neg_summaries
     st.dataframe(
-        top_5_isolated[["이름", "👎 받은 소외표시", "🎯 주된 서먹한 사유 (핵심어)"]], 
+        top_5_isolated[["이름", "👎 받은 소외표시", "🎯 주된 서먹한 사유 요약 (문장그룹)"]], 
         use_container_width=True, 
         hide_index=True
     )
