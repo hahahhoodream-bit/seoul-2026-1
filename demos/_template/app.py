@@ -48,7 +48,7 @@ def validate_csv(df) -> tuple[bool, str]:
     
     # [★오류 해결 완료★] 원래 코드에 박혀있던 한글 '또는'을 파이썬 문법 'or'로 확실하게 고쳤습니다.
     for col in required_cols:
-        if df[col].isna().any() 또는 (df[col] == "").any():
+        if df[col].isna().any() or (df[col] == "").any():
             missing_rows = df[df[col].isna() | (df[col] == "")].index.tolist()
             return False, f"'{col}' 컬럼에 빈 값이 있습니다: {missing_rows}"
     
