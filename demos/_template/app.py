@@ -70,7 +70,7 @@ def build_network_graph(df):
     
     # distant_friend 엣지 (빨간색 - 소외 관계)
     for _, row in df.iterrows():
-        if pd.notna(row["distant_friend"]) 및 row["distant_friend"] in df["name"].values:
+        if pd.notna(row["distant_friend"]) and row["distant_friend"] in df["name"].values:
             G.add_edge(row["name"], row["distant_friend"], relation="distant", color="red")
     
     return G
