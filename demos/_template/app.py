@@ -140,21 +140,6 @@ def visualize_network(G, df):
     return fig
 
 
-def calculate_network_metrics(df, G):
-    """기능 3: 중심성·관계성향만 표시 (친밀/소외 수치는 그래프 호버로 확인 가능하므로 제외)"""
-    metrics = []
-    for name in df["name"]:
-        best_received = sum(1 for _, _, data in G.in_edges(name, data=True) if data.get("relation") == "best")
-        distant_received = sum(1 for _, _, data in G.in_edges(name, data=True) if data.get("relation") == "distant")
-        centrality = nx.degree_centrality(G).get(name, 0)
-        metrics.append({
-            "이름": name,
-            "🔗 중심성": round(centrality, 3),
-            "📊 관계성향": "외향적" if best_received > distant_received else "내향적"
-        })
-    return pd.DataFrame(metrics).sort_values("🔗 중심성", ascending=False)
-
-
 def summarize_reasons_by_group(reason_list, is_positive=True):
     if not reason_list:
         return "특별한 사유 없음"
@@ -235,53 +220,46 @@ st.plotly_chart(fig, use_container_width=True)
 
 
 # ──────────────────────────────────────────────────────────────
-# [기능 ③] 관계 분석 지표 + 상위 5명 사유 요약
+# [기능 ③] 친밀도·소외도 상위 5명 및 사유 요약
 # ──────────────────────────────────────────────────────────────
-st.subheader("③ 관계 분석 지표 및 사유 요약")
-metrics_df = calculate_network_metrics(df, G)
+st.subheader("③ 친밀도·소외도 상위 5명 및 사유 요약")
 
-with st.expander("📖 지표 설명 보기"):
-    st.markdown(
-        "- **🔗 중심성**: 학급 안에서 얼마나 많은 관계(친밀+서먹 모두)에 연결되어 있는지를 나타내는 수치\n"
-        "- **📊 관계성향**: 친한 친구로 선택받은 횟수가 더 많으면 외향적, 서먹한 친구로 더 많이 선택받으면 내향적으로 분류\n"
-        "- 친밀 표시·소외 표시 횟수는 ② 그래프에서 이름에 마우스를 올리면 확인할 수 있습니다"
-    )
-
-st.dataframe(metrics_df, use_container_width=True, hide_index=True)
-
-st.markdown("---")
-st.markdown("### 🔍 친밀도·소외도 상위 5명 및 선택 사유 요약")
+# 각 학생별 친밀·소외 수신 횟수 계산
+name_stats = []
+for name in df["name"]:
+    best_received = sum(1 for _, _, data in G.in_edges(name, data=True) if data.get("relation") == "best")
+    distant_received = sum(1 for _, _, data in G.in_edges(name, data=True) if data.get("relation") == "distant")
+    name_stats.append({"이름": name, "best": best_received, "distant": distant_received})
+stats_df = pd.DataFrame(name_stats)
 
 col_pos, col_neg = st.columns(2)
 
 with col_pos:
     st.markdown("#### 🏆 친밀도 상위 5명")
-    top_5_intimate = []
-    for _, row in metrics_df.nlargest(5, "🔗 중심성").iterrows():
-        name = row["이름"]
-        best_received = sum(1 for _, _, data in G.in_edges(name, data=True) if data.get("relation") == "best")
+    top5_pos = stats_df.nlargest(5, "best")
+    result_pos = []
+    for _, row in top5_pos.iterrows():
         reason_summary = summarize_reasons_by_group(
-            df[df["best_friend"] == name]["reason_pos"].tolist(), is_positive=True
+            df[df["best_friend"] == row["이름"]]["reason_pos"].tolist(), is_positive=True
         )
-        top_5_intimate.append({
-            "이름": name,
-            "친한 친구로 선택받은 횟수": best_received,
-            "주된 친밀 사유 요약": reason_summary
+        result_pos.append({
+            "이름": row["이름"],
+            "친한 친구로 선택받은 횟수": row["best"],
+            "주된 친밀 사유": reason_summary
         })
-    st.dataframe(pd.DataFrame(top_5_intimate), use_container_width=True, hide_index=True)
+    st.dataframe(pd.DataFrame(result_pos), use_container_width=True, hide_index=True)
 
 with col_neg:
     st.markdown("#### ⚠️ 소외도 상위 5명")
-    top_5_isolated = []
-    for _, row in metrics_df.nlargest(5, "🔗 중심성").iterrows():
-        name = row["이름"]
-        distant_received = sum(1 for _, _, data in G.in_edges(name, data=True) if data.get("relation") == "distant")
+    top5_neg = stats_df.nlargest(5, "distant")
+    result_neg = []
+    for _, row in top5_neg.iterrows():
         reason_summary = summarize_reasons_by_group(
-            df[df["distant_friend"] == name]["reason_neg"].tolist(), is_positive=False
+            df[df["distant_friend"] == row["이름"]]["reason_neg"].tolist(), is_positive=False
         )
-        top_5_isolated.append({
-            "이름": name,
-            "서먹한 친구로 선택받은 횟수": distant_received,
-            "주된 서먹 사유 요약": reason_summary
+        result_neg.append({
+            "이름": row["이름"],
+            "서먹한 친구로 선택받은 횟수": row["distant"],
+            "주된 서먹 사유": reason_summary
         })
-    st.dataframe(pd.DataFrame(top_5_isolated), use_container_width=True, hide_index=True)
+    st.dataframe(pd.DataFrame(result_neg), use_container_width=True, hide_index=True)
