@@ -61,10 +61,10 @@ def build_network_graph(df):
         G.add_node(name)
     for _, row in df.iterrows():
         if pd.notna(row["best_friend"]) and row["best_friend"] in df["name"].values:
-            G.add_edge(row["name"], row["best_friend"], relation="best", color="green")
+            G.add_edge(row["name"], row["best_friend"], relation="best", color="#2E8B57")
     for _, row in df.iterrows():
         if pd.notna(row["distant_friend"]) and row["distant_friend"] in df["name"].values:
-            G.add_edge(row["name"], row["distant_friend"], relation="distant", color="red")
+            G.add_edge(row["name"], row["distant_friend"], relation="distant", color="#CD5C5C")
     return G
 
 
@@ -106,7 +106,8 @@ def visualize_network(G, df):
     for i in range(0, len(edge_x), 3):
         edge_trace = go.Scatter(
             x=edge_x[i:i+3], y=edge_y[i:i+3], mode='lines',
-            line=dict(width=2, color=edge_colors[i//3]),
+            line=dict(width=1.5, color=edge_colors[i//3]),
+            opacity=0.6,
             hoverinfo='none', showlegend=False
         )
         edge_trace_list.append(edge_trace)
@@ -127,8 +128,8 @@ def visualize_network(G, df):
     )
 
     fig = go.Figure(data=edge_trace_list + [node_trace])
-    fig.add_trace(go.Scatter(x=[None], y=[None], mode='lines', line=dict(color='green', width=3), name='친한 친구 (best_friend)'))
-    fig.add_trace(go.Scatter(x=[None], y=[None], mode='lines', line=dict(color='red', width=3), name='서먹한 친구 (distant_friend)'))
+    fig.add_trace(go.Scatter(x=[None], y=[None], mode='lines', line=dict(color='#2E8B57', width=3), name='친한 친구 (best_friend)'))
+    fig.add_trace(go.Scatter(x=[None], y=[None], mode='lines', line=dict(color='#CD5C5C', width=3), name='서먹한 친구 (distant_friend)'))
 
     fig.update_layout(
         title_text="또래관계 네트워크 (화살표 방향: 자신 → 대상) | 노드 크기: 받은 선택의 총량",
@@ -143,38 +144,50 @@ def visualize_network(G, df):
 def summarize_reasons_by_group(reason_list, is_positive=True):
     if not reason_list:
         return "특별한 사유 없음"
-    categories = Counter()
+
+    # 카테고리별 키워드 — 넓게 설정하여 웬만한 답변 흡수
+    POS_CATEGORIES = [
+        ("밝고 활발한 성격",        ["성격", "착하", "활발", "밝다", "밝아", "좋다", "좋아", "친하", "긍정", "웃기", "재미", "재밌", "개그", "유머", "웃음", "즐거", "신나", "유쾌"]),
+        ("친절하고 배려심이 많음",   ["친절", "도와", "배려", "잘해", "챙겨", "다정", "상냥", "따뜻", "살펴"]),
+        ("취미와 대화가 잘 통함",    ["취미", "게임", "통한다", "통해", "관심사", "이야기", "코드", "좋아하는", "같이 좋아", "공통", "얘기"]),
+        ("자주 같이 어울림",         ["같이", "함께", "놀아", "놀았", "어울", "항상", "매일", "자주", "붙어"]),
+        ("오래된 인연",              ["오래", "어릴", "초등", "같은 반", "예전", "친구였", "알고 지", "오랫동안"]),
+    ]
+
+    NEG_CATEGORIES = [
+        ("대화나 교류가 적음",        ["말", "대화", "이야기", "서먹", "어색", "안친", "모름", "모르", "얘기", "말수", "말이 없", "접점"]),
+        ("과도한 장난이나 갈등",      ["싸움", "장난", "괴롭", "시비", "때려", "다퉜", "싫어", "미워", "짜증", "화나", "다툼"]),
+        ("성격 차이 또는 배려 부족",  ["무시", "이기", "욕", "성격", "나빠", "불편", "차갑", "거슬", "예민", "부딪"]),
+        ("함께할 기회가 없었음",      ["반", "조", "기회", "자리", "없어서", "같이", "못", "만난 적", "접할"]),
+        ("특별한 이유 없는 서먹함",   ["조용", "말없", "관심 없", "없다", "모르겠", "그냥", "딱히", "별로", "특별히", "이유"]),
+    ]
+
+    categories = POS_CATEGORIES if is_positive else NEG_CATEGORIES
+    counter = Counter()
+    has_unmatched = False
+
     for reason in reason_list:
         if pd.isna(reason) or str(reason).strip() == "":
             continue
         text = str(reason).strip()
-        if is_positive:
-            if any(w in text for w in ["성격", "착하다", "활발", "밝다", "좋다", "친하다"]):
-                categories["성격이 좋고 활발함"] += 1
-            elif any(w in text for w in ["친절", "도와", "배려", "잘해", "착해"]):
-                categories["친절하고 배려심이 많음"] += 1
-            elif any(w in text for w in ["재미", "웃기", "재밌", "개그"]):
-                categories["유머러스하고 같이 있으면 즐거움"] += 1
-            elif any(w in text for w in ["취미", "게임", "통한다", "관심사", "이야기", "코드"]):
-                categories["취미나 대화가 잘 통함"] += 1
-            else:
-                categories["기타 친근감 표시"] += 1
-        else:
-            if any(w in text for w in ["말", "대화", "이야기", "서먹", "어색", "안친"]):
-                categories["평소 대화나 소통이 부족함"] += 1
-            elif any(w in text for w in ["싸움", "장난", "괴롭", "시비", "때려"]):
-                categories["과도한 장난이나 갈등이 있었음"] += 1
-            elif any(w in text for w in ["무시", "이기", "욕", "성격", "나빠"]):
-                categories["성격적 차이 및 배려 부족"] += 1
-            elif any(w in text for w in ["반", "조", "기회", "자리"]):
-                categories["같은 모둠이나 놀 기회가 없었음"] += 1
-            else:
-                categories["특별한 갈등 없는 단순 서먹함"] += 1
+        matched = False
+        for label, keywords in categories:
+            if any(w in text for w in keywords):
+                counter[label] += 1
+                matched = True
+                break
+        if not matched:
+            has_unmatched = True
 
-    top_categories = categories.most_common(2)
-    if not top_categories:
+    # 분류 안 된 답변이 있을 경우 고정 문구로 처리
+    if has_unmatched:
+        fallback = "그 외 개인적 친밀감" if is_positive else "그 외 개인적 거리감"
+        counter[fallback] += 1
+
+    top = counter.most_common(2)
+    if not top:
         return "특별한 사유 없음"
-    return " / ".join([f"{cat}({count}명)" for cat, count in top_categories])
+    return " / ".join([f"{label}({count}명)" for label, count in top])
 
 
 # ──────────────────────────────────────────────────────────────
@@ -224,7 +237,6 @@ st.plotly_chart(fig, use_container_width=True)
 # ──────────────────────────────────────────────────────────────
 st.subheader("③ 친밀도·소외도 상위 5명 및 사유 요약")
 
-# 각 학생별 친밀·소외 수신 횟수 계산
 name_stats = []
 for name in df["name"]:
     best_received = sum(1 for _, _, data in G.in_edges(name, data=True) if data.get("relation") == "best")
